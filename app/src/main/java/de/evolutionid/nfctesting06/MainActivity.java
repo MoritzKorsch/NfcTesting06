@@ -6,26 +6,35 @@ import android.content.IntentFilter;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
     NfcAdapter nfcAdapter;
+    Tag tag;
+
+    //GUI elements
     EditText edtWriteToTag;
     TextView txtTagContent;
+    Button btnWrite;
+
 
 
     @Override
@@ -35,25 +44,64 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
-
         //Initialize the NFC component
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
         //Initialize GUI Elements
         edtWriteToTag = (EditText) findViewById(R.id.edtWriteToTag);
         txtTagContent = (TextView) findViewById(R.id.txtTagContent);
+        btnWrite = (Button) findViewById(R.id.btnWrite);
 
         //Some more GUI functionality
+        btnWrite.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //write the message onto tag, if possible.
+                writeNdefMessage(tag, createNdefMessage(" " + edtWriteToTag.getText() + " "));
+                edtWriteToTag.setText(""); //Clear the input.
+            }
+        });
 
+    }
 
+    /**
+     * Creates a NdefMessage of the given String.
+     *
+     * @param content the message that is being translated into a NDEF message
+     * @return the NDEF message containing the text record with the string
+     */
+    private NdefMessage createNdefMessage(String content) {
+        NdefRecord ndefRecord = createTextRecord(content);
+        return new NdefMessage(new NdefRecord[]{ndefRecord});
+    }
+
+    /**
+     * Creates a record from a given text (for UTF-8).
+     *
+     * @param content the text to be encoded
+     * @return text as record
+     */
+    private NdefRecord createTextRecord(String content) {
+        try {
+            //If anything else than UTF-8 is needed, you can change it here
+            byte[] language = Locale.getDefault().getLanguage().getBytes("UTF-8");
+            final byte[] text = content.getBytes("UTF-8");
+            final int languageLength = language.length;
+            final int textLength = text.length;
+            final ByteArrayOutputStream payload = new ByteArrayOutputStream(1 + languageLength + textLength);
+
+            //Write the record
+            payload.write((byte) (languageLength & 0x1F));
+            payload.write(language, 0, languageLength);
+            payload.write(text, 0, textLength);
+
+            return new NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_TEXT, new byte[0], payload.toByteArray());
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: createTextRecord()", Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
+        return null;
     }
 
     @Override
@@ -78,14 +126,18 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    //Gets called when app is active (in foreground).
+    /**
+     * Gets called when app is active (in foreground).
+     */
     @Override
     protected void onResume() {
         super.onResume();
         enableForegroundDispatchSystem();
     }
 
-    //Gets called when focus is lost (e.g. user returns to the home screen).
+    /**
+     * Gets called when focus is lost (e.g. user returns to the home screen).
+     */
     @Override
     protected void onPause() {
         super.onPause();
@@ -110,9 +162,16 @@ public class MainActivity extends AppCompatActivity {
         nfcAdapter.disableForegroundDispatch(this);
     }
 
+    /**
+     * Handles new intents (generally by scanning an NFC tag).
+     * @param intent the discovered intent
+     */
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+
+        //Locally store the tag as object
+        tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
 
         //If intent is a NFC tag
         if (intent.hasExtra(NfcAdapter.EXTRA_TAG)) {
@@ -177,8 +236,76 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Error: getTextFromNdefRecord()", Toast.LENGTH_SHORT).show();
             e.printStackTrace();
         }
-        return null;
+        //Feedback, if everything else fails.
+        return "Error reading Tag. Contact developer!";
     }
+
+    private void writeNdefMessage(Tag tag, NdefMessage ndefMessage) {
+        try {
+            //Checks if the tag is still in contact with the device.
+            if (tag == null) {
+                throw new NullPointerException("Error: writeNdefMessage() - Tag object is null");
+            }
+            //Get the tag
+            Ndef ndef = Ndef.get(tag);
+            //if the Tag is not formatted yet
+            if (ndef == null) {
+                //format it and immediately write the desired message on it.
+                formatTag(tag, ndefMessage);
+            } else {
+                ndef.connect();
+                //If the tag is not writable (i.e. set to read-only) 
+                if (!ndef.isWritable()) {
+                    //Give some Feedback and close the connection to the Tag
+                    Toast.makeText(this, "Tag is not writable!", Toast.LENGTH_SHORT).show();
+                    ndef.close();
+                    return;
+                }
+                
+                /* If you run into problems with size limitations, uncomment this!
+                if(ndef.getMaxSize() - ndefMessage.getByteArrayLength() < 0) {
+                    Toast.makeText(this, "Text to large for tag!", Toast.LENGTH_SHORT).show();
+                    ndef.close();
+                    return;
+                } */
+
+                ndef.writeNdefMessage(ndefMessage);
+                ndef.close();
+                Toast.makeText(this, "Tag written!", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: writeNdefMessage()", Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Formats a tag to NDEF format and writes a message to it.
+     *
+     * @param tag         the tag object
+     * @param ndefMessage the message to put on the tag after formatting it
+     */
+    private void formatTag(Tag tag, NdefMessage ndefMessage) {
+        try {
+            NdefFormatable ndefFormatable = NdefFormatable.get(tag);
+
+            //If the tag cannot be formatted, give Feedback and return
+            if (ndefFormatable == null) {
+                Toast.makeText(this, "Tag is not NDEF formatable!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            //Connect, format and write to tag, disconnect, give feedback.
+            ndefFormatable.connect();
+            ndefFormatable.format(ndefMessage);
+            ndefFormatable.close();
+            Toast.makeText(this, "Tag formatted!", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: formatTag()", Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
+    }
+
 
 
 }
