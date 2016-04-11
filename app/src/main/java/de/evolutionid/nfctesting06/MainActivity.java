@@ -3,6 +3,7 @@ package de.evolutionid.nfctesting06;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
@@ -11,13 +12,20 @@ import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.provider.ContactsContract;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,15 +35,23 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
+    //TODO: maybe delete
+    static final int PICK_CONTACT_REQUEST = 1;  // The request code
     NfcAdapter nfcAdapter;
     Tag tag;
-
-    //GUI elements
+    //region GUI elements
+    Spinner spnMode;
+    RelativeLayout rlText;
+    TextView txtTagContentText;
+    LinearLayout llTextToTag;
     EditText edtWriteToTag;
-    TextView txtTagContent;
-    Button btnWrite;
-
-
+    Button btnWriteText;
+    RelativeLayout rlContact;
+    ListView lstContacts; //TODO: delete
+    LinearLayout llContactToTag;
+    TextView txtContactToTag;
+    //endregion
+    Button btnWriteContact;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,21 +63,63 @@ public class MainActivity extends AppCompatActivity {
         //Initialize the NFC component
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
-        //Initialize GUI Elements
+        //region GUI element initialization
+        //(indentation according to affiliation, order according to design)
+        spnMode = (Spinner) findViewById(R.id.spnMode);
+        rlText = (RelativeLayout) findViewById(R.id.rlText);
+        txtTagContentText = (TextView) findViewById(R.id.txtTagContentText);
+        llTextToTag = (LinearLayout) findViewById(R.id.llTextToTag);
         edtWriteToTag = (EditText) findViewById(R.id.edtWriteToTag);
-        txtTagContent = (TextView) findViewById(R.id.txtTagContent);
-        btnWrite = (Button) findViewById(R.id.btnWrite);
+        btnWriteText = (Button) findViewById(R.id.btnWriteText);
+        rlContact = (RelativeLayout) findViewById(R.id.rlContact);
+        lstContacts = (ListView) findViewById(R.id.lstContacts); //TODO: delete
+        llContactToTag = (LinearLayout) findViewById(R.id.llContactToTag);
+        txtContactToTag = (TextView) findViewById(R.id.txtContactToTag);
+        btnWriteContact = (Button) findViewById(R.id.btnWriteContact);
+        //endregion
 
-        //Some more GUI functionality
-        btnWrite.setOnClickListener(new View.OnClickListener() {
+        //region Some more GUI functionality
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.spnMode, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spnMode.setAdapter(adapter);
+        //endregion
+
+        //region OnClicks
+        btnWriteText.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 //write the message onto tag, if possible.
                 writeNdefMessage(tag, createNdefMessage(" " + edtWriteToTag.getText() + " "));
-                edtWriteToTag.setText(""); //Clear the input.
+                //Clear the input.
+                edtWriteToTag.setText("");
             }
         });
 
+        spnMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                //Show and hide some GUI elements depending on what mode is chosen
+                switch (spnMode.getSelectedItem().toString()) {
+                    case "Text":
+                        rlContact.setVisibility(View.GONE);
+                        rlText.setVisibility(View.VISIBLE);
+                        break;
+                    case "Contacts":
+                        rlText.setVisibility(View.GONE);
+                        rlContact.setVisibility(View.VISIBLE);
+                        break;
+                    default:
+                        txtTagContentText.setText("spnMode.onItemSelected case default");
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+        //endregion
     }
 
     /**
@@ -102,6 +160,9 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         return null;
+        //Using the code below instead of the code above (all of it, as of 2016-03-08), is
+        //the better choice, but can only be used by API level 21 or above.
+        //return NdefRecord.createTextRecord(Locale.getDefault().getLanguage(), content);
     }
 
     @Override
@@ -164,6 +225,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Handles new intents (generally by scanning an NFC tag).
+     *
      * @param intent the discovered intent
      */
     @Override
@@ -204,10 +266,10 @@ public class MainActivity extends AppCompatActivity {
         if (ndefRecords != null && ndefRecords.length > 0) {
             NdefRecord ndefRecord = ndefRecords[0];
             String tagContent = getTextFromNdefRecord(ndefRecord);
-            txtTagContent.setText(tagContent);
+            txtTagContentText.setText(tagContent);
         } else {
             //Feedback if there are no records
-            txtTagContent.setText("[No records on Tag]");
+            txtTagContentText.setText("[No records on Tag]");
         }
     }
 
@@ -254,14 +316,14 @@ public class MainActivity extends AppCompatActivity {
                 formatTag(tag, ndefMessage);
             } else {
                 ndef.connect();
-                //If the tag is not writable (i.e. set to read-only) 
+                //If the tag is not writable (i.e. set to read-only)
                 if (!ndef.isWritable()) {
                     //Give some Feedback and close the connection to the Tag
                     Toast.makeText(this, "Tag is not writable!", Toast.LENGTH_SHORT).show();
                     ndef.close();
                     return;
                 }
-                
+
                 /* If you run into problems with size limitations, uncomment this!
                 if(ndef.getMaxSize() - ndefMessage.getByteArrayLength() < 0) {
                     Toast.makeText(this, "Text to large for tag!", Toast.LENGTH_SHORT).show();
@@ -306,6 +368,63 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * TODO: maybe delete
+     *
+     * @param tag
+     */
+    private void writeContactToAddressBook(Tag tag) {
+        Intent intent = new Intent(ContactsContract.Intents.Insert.ACTION);
+        intent.setType(ContactsContract.RawContacts.CONTENT_TYPE);
+
+
+    }
+
+    private void pickContact() {
+        Intent pickContactIntent = new Intent(Intent.ACTION_PICK, Uri.parse("content://contacts"));
+        pickContactIntent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE); // Only show contacts w/ phone numbers
+        startActivityForResult(pickContactIntent, PICK_CONTACT_REQUEST);
+    }
+
+    //TODO: maybe delete
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Check which request we're responding to
+        if (requestCode == PICK_CONTACT_REQUEST) {
+            // Make sure the request was successful
+            if (resultCode == RESULT_OK) {
+                // The user picked a contact.
+                // Get the URI that points to the selected contact
+                Uri contactUri = data.getData();
+                //txtTagContentText.setText(contactUri.toString());
+                //TODO: write everything to txt in vcard format
+                //String contact = getVCardString(contactUri);
+                // Do something with the contact here
+                txtTagContentText.setText(contactUri.toString());
+
+            }
+        }
+    }
+
+
+    /**
+     * TODO: maybe delete
+     * Helper method to help build a string out of a contact Uri.
+     *
+     * @param contactUri the contact to create a string out of
+     * @return the contact as a string
+     */
+    private String getVCardString(Uri contactUri) {
+
+        return "";
+    }
+
+    //TODO: maybe delete
+    private NdefRecord createContactRecord() {
+        byte[] mimeData = null;
+        //TODO: Use "ContentContract.Contacts.CONTENT_VCARD_TYPE" (constant value: "text/x-vcard"
+        return NdefRecord.createMime("text/x-vcard", mimeData);
+    }
 
 
 }

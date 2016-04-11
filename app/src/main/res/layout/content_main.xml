@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -17,31 +18,80 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/txtTagContent"
+        <Spinner
+            android:id="@+id/spnMode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:padding="10dp" />
 
-        <LinearLayout
+        <RelativeLayout
+            android:id="@+id/rlText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:orientation="horizontal">
+            android:layout_below="@id/spnMode">
 
-            <EditText
-                android:id="@+id/edtWriteToTag"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/txtTagContentText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <LinearLayout
+                android:id="@+id/llTextToTag"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1" />
+                android:layout_alignParentBottom="true"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btnWrite"
+                <EditText
+                    android:id="@+id/edtWriteToTag"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btnWriteText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Write" />
+
+            </LinearLayout>
+
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/rlContact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/spnMode">
+
+            <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+                android:id="@+id/contact_list"
+                android:name="de.evolutionid.nfctesting06.ui.ContactListFragment"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Write" />
+                android:layout_height="wrap_content" />
 
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/llContactToTag"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/txtContactToTag"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btnWriteContact"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Write" />
+
+            </LinearLayout>
+
+        </RelativeLayout>
 
     </LinearLayout>
 

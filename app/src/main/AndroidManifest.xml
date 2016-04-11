@@ -3,8 +3,10 @@
     package="de.evolutionid.nfctesting06">
 
     <uses-permission android:name="android.permission.NFC"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
+
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -19,6 +21,14 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- use this if a NFC tag with a contact should be handled by this app, instead of the Contact app.
+            <intent-filter>
+                <action android:name="android.intent.action.NDEF_DISCOVERED"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/vcard"/>
+                <data android:mimeType="text/x-vcard"/>
+            </intent-filter>
+            -->
         </activity>
     </application>
 
