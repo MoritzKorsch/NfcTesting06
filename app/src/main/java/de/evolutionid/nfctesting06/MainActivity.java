@@ -3,7 +3,6 @@ package de.evolutionid.nfctesting06;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.Uri;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
@@ -12,7 +11,6 @@ import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.provider.ContactsContract;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
@@ -23,7 +21,6 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -35,10 +32,9 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
-    //TODO: maybe delete
-    static final int PICK_CONTACT_REQUEST = 1;  // The request code
     NfcAdapter nfcAdapter;
     Tag tag;
+
     //region GUI elements
     Spinner spnMode;
     RelativeLayout rlText;
@@ -47,11 +43,10 @@ public class MainActivity extends AppCompatActivity {
     EditText edtWriteToTag;
     Button btnWriteText;
     RelativeLayout rlContact;
-    ListView lstContacts; //TODO: delete
     LinearLayout llContactToTag;
     TextView txtContactToTag;
-    //endregion
     Button btnWriteContact;
+    //endregion
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,7 +67,6 @@ public class MainActivity extends AppCompatActivity {
         edtWriteToTag = (EditText) findViewById(R.id.edtWriteToTag);
         btnWriteText = (Button) findViewById(R.id.btnWriteText);
         rlContact = (RelativeLayout) findViewById(R.id.rlContact);
-        lstContacts = (ListView) findViewById(R.id.lstContacts); //TODO: delete
         llContactToTag = (LinearLayout) findViewById(R.id.llContactToTag);
         txtContactToTag = (TextView) findViewById(R.id.txtContactToTag);
         btnWriteContact = (Button) findViewById(R.id.btnWriteContact);
@@ -86,13 +80,23 @@ public class MainActivity extends AppCompatActivity {
         //endregion
 
         //region OnClicks
+        /**
         btnWriteText.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //write the message onto tag, if possible.
+        // write the message onto tag, if possible.
                 writeNdefMessage(tag, createNdefMessage(" " + edtWriteToTag.getText() + " "));
-                //Clear the input.
-                edtWriteToTag.setText("");
+        // Clear the input.
+        //edtWriteToTag.setText("");
+            }
+        });
+         */
+
+        btnWriteText.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Write the url onto tag, if possible.
+                writeNdefMessage(tag, createNdefMessage(edtWriteToTag.getText().toString()));
             }
         });
 
@@ -108,6 +112,10 @@ public class MainActivity extends AppCompatActivity {
                     case "Contacts":
                         rlText.setVisibility(View.GONE);
                         rlContact.setVisibility(View.VISIBLE);
+                        break;
+                    case "Website":
+                        rlContact.setVisibility(View.GONE);
+                        rlText.setVisibility(View.VISIBLE);
                         break;
                     default:
                         txtTagContentText.setText("spnMode.onItemSelected case default");
@@ -129,7 +137,13 @@ public class MainActivity extends AppCompatActivity {
      * @return the NDEF message containing the text record with the string
      */
     private NdefMessage createNdefMessage(String content) {
-        NdefRecord ndefRecord = createTextRecord(content);
+        NdefRecord ndefRecord;
+        //TODO: overhaul if-else block. Use fragments.
+        //if (spnMode.getSelectedItem().toString().equals("Website")) {
+        ndefRecord = createUrlRecord(content);
+        //} else {
+        //    ndefRecord = createTextRecord(content);
+        //}
         return new NdefMessage(new NdefRecord[]{ndefRecord});
     }
 
@@ -163,6 +177,23 @@ public class MainActivity extends AppCompatActivity {
         //Using the code below instead of the code above (all of it, as of 2016-03-08), is
         //the better choice, but can only be used by API level 21 or above.
         //return NdefRecord.createTextRecord(Locale.getDefault().getLanguage(), content);
+    }
+
+    private NdefRecord createUrlRecord(String inputUrl) {
+        String url;
+        if (inputUrl != null) {
+            if (!inputUrl.startsWith("http://")) {
+                if (!inputUrl.startsWith("www.")) {
+                    url = "http://www." + inputUrl;
+                } else {
+                    url = "http://" + inputUrl;
+                }
+            } else {
+                url = inputUrl;
+            }
+            return NdefRecord.createUri(url);
+        }
+        return null;
     }
 
     @Override
@@ -304,21 +335,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void writeNdefMessage(Tag tag, NdefMessage ndefMessage) {
         try {
-            //Checks if the tag is still in contact with the device.
+            // Checks if the tag is still in contact with the device.
             if (tag == null) {
                 throw new NullPointerException("Error: writeNdefMessage() - Tag object is null");
             }
-            //Get the tag
+            // Get the tag
             Ndef ndef = Ndef.get(tag);
-            //if the Tag is not formatted yet
+            // if the Tag is not formatted yet
             if (ndef == null) {
-                //format it and immediately write the desired message on it.
+                // format it and immediately write the desired message on it.
                 formatTag(tag, ndefMessage);
             } else {
                 ndef.connect();
-                //If the tag is not writable (i.e. set to read-only)
+                // If the tag is not writable (i.e. set to read-only)
                 if (!ndef.isWritable()) {
-                    //Give some Feedback and close the connection to the Tag
+                    // Give some Feedback and close the connection to the Tag
                     Toast.makeText(this, "Tag is not writable!", Toast.LENGTH_SHORT).show();
                     ndef.close();
                     return;
@@ -367,64 +398,5 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
-
-    /**
-     * TODO: maybe delete
-     *
-     * @param tag
-     */
-    private void writeContactToAddressBook(Tag tag) {
-        Intent intent = new Intent(ContactsContract.Intents.Insert.ACTION);
-        intent.setType(ContactsContract.RawContacts.CONTENT_TYPE);
-
-
-    }
-
-    private void pickContact() {
-        Intent pickContactIntent = new Intent(Intent.ACTION_PICK, Uri.parse("content://contacts"));
-        pickContactIntent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE); // Only show contacts w/ phone numbers
-        startActivityForResult(pickContactIntent, PICK_CONTACT_REQUEST);
-    }
-
-    //TODO: maybe delete
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // Check which request we're responding to
-        if (requestCode == PICK_CONTACT_REQUEST) {
-            // Make sure the request was successful
-            if (resultCode == RESULT_OK) {
-                // The user picked a contact.
-                // Get the URI that points to the selected contact
-                Uri contactUri = data.getData();
-                //txtTagContentText.setText(contactUri.toString());
-                //TODO: write everything to txt in vcard format
-                //String contact = getVCardString(contactUri);
-                // Do something with the contact here
-                txtTagContentText.setText(contactUri.toString());
-
-            }
-        }
-    }
-
-
-    /**
-     * TODO: maybe delete
-     * Helper method to help build a string out of a contact Uri.
-     *
-     * @param contactUri the contact to create a string out of
-     * @return the contact as a string
-     */
-    private String getVCardString(Uri contactUri) {
-
-        return "";
-    }
-
-    //TODO: maybe delete
-    private NdefRecord createContactRecord() {
-        byte[] mimeData = null;
-        //TODO: Use "ContentContract.Contacts.CONTENT_VCARD_TYPE" (constant value: "text/x-vcard"
-        return NdefRecord.createMime("text/x-vcard", mimeData);
-    }
-
 
 }
